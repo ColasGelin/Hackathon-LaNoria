@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 ANÁLISIS DE PELIGROS: Primero evalúa si hay PELIGRO INMEDIATO que requiera alerta urgente.
 
 SITUACIONES DE PELIGRO INMEDIATO (requieren alerta):
+- Paredes o estructuras a menos de 1 metro
 - Escaleras descendentes a menos de 1 metro
 - Obstáculos grandes en el camino directo (postes, paredes, vehículos)
 - Bordillos o desniveles peligrosos muy cerca
@@ -36,7 +37,7 @@ SITUACIONES DE PELIGRO INMEDIATO (requieren alerta):
 FORMATO DE RESPUESTA OBLIGATORIO:
 
 Si hay PELIGRO, responde EXACTAMENTE así:
-{"danger": true, "description": "Cuidado! Estás a punto de chocarte con una pared"}
+{"danger": true, "description": "Cuidado! Estás a punto de chocarte con una pared, podrías evitarla moviendote a la derecha"}
 
 Si NO hay peligro, responde EXACTAMENTE así:
 {"danger": false, "description": "Delante tuya hay una mesa y dos sillas, y una persona saludandote"}

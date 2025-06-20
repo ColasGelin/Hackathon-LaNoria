@@ -27,6 +27,8 @@ export default function Camera({}: CameraProps) {
   const [analysisCount, setAnalysisCount] = useState<number>(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isDangerous, setIsDangerous] = useState(false);
+  const [isEmergency, setIsEmergency] = useState(false);
+  const [emergencyMessage, setEmergencyMessage] = useState<string>('');
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const touchStartY = useRef<number>(0);
@@ -35,21 +37,6 @@ export default function Camera({}: CameraProps) {
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     touchStartTime.current = Date.now();
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const touchEndTime = Date.now();
-    
-    const deltaY = touchStartY.current - touchEndY;
-    const deltaTime = touchEndTime - touchStartTime.current;
-    
-    // Swipe up detection: moved up at least 50px in less than 500ms
-    if (deltaY > 50 && deltaTime < 500) {
-      console.log("HEKJWQHEJKQWH");
-      e.preventDefault();
-      e.stopPropagation();
-    }
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -215,8 +202,81 @@ export default function Camera({}: CameraProps) {
       window.speechSynthesis.speak(utterance);
     } else {
       console.warn('Speech synthesis not supported');
+      setIsSpeaking(false);
     }
   }, []);
+
+  const handleEmergency = useCallback(async () => {
+    try {
+      setIsEmergency(true);
+      
+      // Capture current frame
+      const frameData = captureFrameForAI();
+      if (!frameData) {
+        throw new Error('Could not capture frame');
+      }
+      
+      // Call emergency API
+      const response = await fetch('/api/emergency', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: frameData }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const message = data.message || 'Emergencia: Persona ciega solicita asistencia inmediata.';
+        
+        setEmergencyMessage(message);
+        
+        // Play alert sound
+        playAlertSound();
+        
+        // Wait longer for the sound to play, then speak the warning
+        setTimeout(() => {
+          speakText(`Activando emergencia. ${message}`);
+        }, 1500);
+        
+        // Show emergency message for 10 seconds
+        setTimeout(() => {
+          setIsEmergency(false);
+          setEmergencyMessage('');
+        }, 10000);
+        
+      } else {
+        throw new Error('Emergency API failed');
+      }
+    } catch (error) {
+      console.error('Emergency error:', error);
+      const fallbackMessage = 'Emergencia: Persona ciega solicita asistencia inmediata. Error al procesar la situación.';
+      setEmergencyMessage(fallbackMessage);
+      playAlertSound();
+      speakText(`Activando emergencia. ${fallbackMessage}`);
+      
+      setTimeout(() => {
+        setIsEmergency(false);
+        setEmergencyMessage('');
+      }, 10000);
+    }
+  }, [captureFrameForAI, playAlertSound, speakText]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    const touchEndTime = Date.now();
+    
+    const deltaY = touchStartY.current - touchEndY;
+    const deltaTime = touchEndTime - touchStartTime.current;
+    
+    // Swipe up detection: moved up at least 50px in less than 500ms
+    if (deltaY > 50 && deltaTime < 500) {
+      console.log("Emergency swipe detected!");
+      e.preventDefault();
+      e.stopPropagation();
+      handleEmergency();
+    }
+  }, [handleEmergency]);
 
   const startAIAnalysis = useCallback(() => {
     if (aiAnalysisRef.current) {
@@ -399,6 +459,23 @@ export default function Camera({}: CameraProps) {
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-yellow-300 rounded-full animate-ping"></div>
                 <span className="text-lg font-bold">⚠️ ¡PELIGRO!</span>
+              </div>
+            </div>
+          )}
+          
+          {isEmergency && (
+            <div className="absolute top-20 left-4 right-4 bg-red-700 bg-opacity-98 text-white p-4 rounded-lg border-4 border-red-400 z-50">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-4 h-4 bg-red-300 rounded-full animate-ping"></div>
+                <span className="text-xl font-bold">🚨 EMERGENCIA ACTIVADA</span>
+              </div>
+              {emergencyMessage && (
+                <div className="bg-black bg-opacity-50 p-3 rounded mt-2">
+                  <p className="text-sm font-medium">{emergencyMessage}</p>
+                </div>
+              )}
+              <div className="mt-3 text-sm bg-red-800 bg-opacity-75 p-2 rounded">
+                <p>Mensaje enviado a servicios de emergencia</p>
               </div>
             </div>
           )}
