@@ -27,6 +27,7 @@ export default function Camera({}: CameraProps) {
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [photoCount, setPhotoCount] = useState<number>(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const startCamera = useCallback(async () => {
     try {
@@ -118,13 +119,44 @@ export default function Camera({}: CameraProps) {
       if (response.ok) {
         const data = await response.json();
         setAiDescription(data.description);
+        // Read the description aloud in Spanish
+        speakText(data.description);
       } else {
         console.error('Failed to analyze frame:', response.statusText);
+        speakText('Error al analizar la imagen');
       }
     } catch (error) {
       console.error('Error analyzing frame:', error);
+      speakText('Error al procesar la imagen');
     } finally {
       setIsAnalyzing(false);
+    }
+  }, []);
+
+  const speakText = useCallback((text: string) => {
+    if ('speechSynthesis' in window) {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      setIsSpeaking(true);
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES'; // Spanish language
+      utterance.rate = 0.9; // Slightly slower for better comprehension
+      utterance.volume = 1.0;
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+      };
+      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        console.error('Speech synthesis error');
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn('Speech synthesis not supported');
     }
   }, []);
 
@@ -185,9 +217,12 @@ export default function Camera({}: CameraProps) {
     }
   }, [isCapturing, stopAIAnalysis]);
 
-  const takeSinglePhoto = useCallback(() => {
-    capturePhoto();
-  }, [capturePhoto]);
+  const analyzeCurrentFrame = useCallback(() => {
+    const frameData = captureFrameForAI();
+    if (frameData) {
+      analyzeFrame(frameData);
+    }
+  }, [captureFrameForAI, analyzeFrame]);
 
   const handleTap = useCallback(() => {
     const TAP_DELAY = 400;
@@ -215,14 +250,14 @@ export default function Camera({}: CameraProps) {
           startPhotoCapture();
         }
       } else if (currentTapCount >= 3) {
-        console.log('Triple tap detected!');
-        takeSinglePhoto();
+        console.log('Triple tap detected! Analyzing current view...');
+        analyzeCurrentFrame();
       }
       
       // Reset tap count
       tapCountRef.current = 0;
     }, TAP_DELAY);
-  }, [isCapturing, startPhotoCapture, stopPhotoCapture, takeSinglePhoto]);
+  }, [isCapturing, startPhotoCapture, stopPhotoCapture, analyzeCurrentFrame]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -230,6 +265,10 @@ export default function Camera({}: CameraProps) {
       stopAIAnalysis();
       if (photoIntervalRef.current) {
         clearInterval(photoIntervalRef.current);
+      }
+      // Stop any ongoing speech
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
       }
     };
   }, [stopAIAnalysis]);
@@ -279,6 +318,32 @@ export default function Camera({}: CameraProps) {
                 </div>
               )}
             </>
+          )}
+          {!isCapturing && isAnalyzing && (
+            <div className="absolute top-4 left-4 right-4 bg-blue-600 bg-opacity-90 text-white p-4 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">Analizando imagen...</span>
+              </div>
+            </div>
+          )}
+          {!isCapturing && aiDescription && (
+            <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                {isSpeaking ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">🔊 Hablando...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium">Descripción</span>
+                  </>
+                )}
+              </div>
+              <p className="text-sm">{aiDescription}</p>
+            </div>
           )}
         </>
       )}
