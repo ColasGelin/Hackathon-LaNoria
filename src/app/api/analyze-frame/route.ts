@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Convert base64 image to the format Gemini expects
     const imageData = image.split(',')[1]; // Remove data:image/jpeg;base64, prefix
