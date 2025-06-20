@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     const imageData = image.split(',')[1]; // Remove data:image/jpeg;base64, prefix
     
     const prompt = `Tu función es ser los ojos de una persona ciega. Esta persona ha tomado una foto con su cámara para entender lo que hay delante suya. 
+    Recuerda que la imagen que estás viendo, es el POV de la persona ciega. Es su punto de vista. La persona que tomó la foto no puede aparecer en la foto. 
 
 ANÁLISIS DE PELIGROS: Primero evalúa si hay PELIGRO INMEDIATO que requiera alerta urgente.
 
@@ -38,7 +39,7 @@ Si hay PELIGRO, responde EXACTAMENTE así:
 {"danger": true, "description": "Cuidado! Estás a punto de chocarte con una pared"}
 
 Si NO hay peligro, responde EXACTAMENTE así:
-{"danger": false, "description": "Delante tuya hay una mesa y dos sillas"}
+{"danger": false, "description": "Delante tuya hay una mesa y dos sillas, y una persona saludandote"}
 
 PRIORIDADES NORMALES (sin peligro):
 1. NAVEGACIÓN Y SEGURIDAD:
