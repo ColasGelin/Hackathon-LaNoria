@@ -18,15 +18,10 @@ interface CameraProps {
 export default function Camera({}: CameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const aiAnalysisRef = useRef<NodeJS.Timeout | null>(null);
-  const photoIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const tapCountRef = useRef<number>(0);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode] = useState<'user' | 'environment'>('environment');
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [photoCount, setPhotoCount] = useState<number>(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isDangerous, setIsDangerous] = useState(false);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -62,35 +57,6 @@ export default function Camera({}: CameraProps) {
     alertAudioRef.current = new Audio('/alerta.mp3');
     alertAudioRef.current.preload = 'auto';
   }, [startCamera]);
-
-  const capturePhoto = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-
-      if (context) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0);
-        
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        
-        // Create download link
-        const url = imageData;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `photo-${Date.now()}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        setPhotoCount(prev => prev + 1);
-        return imageData;
-      }
-    }
-    return null;
-  }, []);
 
   const captureFrameForAI = useCallback(() => {
     if (videoRef.current && canvasRef.current) {
@@ -226,63 +192,6 @@ export default function Camera({}: CameraProps) {
     }
   }, []);
 
-  const startAIAnalysis = useCallback(() => {
-    if (aiAnalysisRef.current) {
-      clearInterval(aiAnalysisRef.current);
-    }
-
-    // Analyze frame every 2 seconds
-    aiAnalysisRef.current = setInterval(() => {
-      const frameData = captureFrameForAI();
-      if (frameData) {
-        analyzeFrame(frameData);
-      }
-    }, 2000);
-  }, [captureFrameForAI, analyzeFrame]);
-
-  const stopAIAnalysis = useCallback(() => {
-    if (aiAnalysisRef.current) {
-      clearInterval(aiAnalysisRef.current);
-      aiAnalysisRef.current = null;
-    }
-    setAiDescription('');
-    setIsAnalyzing(false);
-  }, []);
-
-  const startPhotoCapture = useCallback(() => {
-    if (!isCapturing) {
-      setIsCapturing(true);
-      setPhotoCount(0);
-      
-      // Take first photo immediately
-      capturePhoto();
-      
-      // Then take photos every 5 seconds
-      photoIntervalRef.current = setInterval(() => {
-        capturePhoto();
-        console.log('Photo captured');
-      }, 5000);
-      
-      // Start AI analysis
-      // startAIAnalysis();
-    }
-  }, [isCapturing, capturePhoto, startAIAnalysis]);
-
-  const stopPhotoCapture = useCallback(() => {
-    if (isCapturing) {
-      if (photoIntervalRef.current) {
-        clearInterval(photoIntervalRef.current);
-        photoIntervalRef.current = null;
-        console.log('Interval cleared');
-      }
-      setIsCapturing(false);
-      setPhotoCount(0);
-      
-      // Stop AI analysis
-      // stopAIAnalysis();
-    }
-  }, [isCapturing, stopAIAnalysis]);
-
   const analyzeCurrentFrame = useCallback(() => {
     const frameData = captureFrameForAI();
     if (frameData) {
@@ -291,54 +200,19 @@ export default function Camera({}: CameraProps) {
   }, [captureFrameForAI, analyzeFrame]);
 
   const handleTap = useCallback(() => {
-    const TAP_DELAY = 400;
-
-    tapCountRef.current++;
-    console.log('Tap detected, count:', tapCountRef.current);
-
-    // Clear any existing timeout to prevent multiple timeouts
-    if (window.tapTimeout) {
-      clearTimeout(window.tapTimeout);
-    }
-
-    // Set new timeout
-    window.tapTimeout = setTimeout(() => {
-      const currentTapCount = tapCountRef.current;
-      console.log('Processing tap count:', currentTapCount);
-      
-      // if (currentTapCount === 2) {
-      //   console.log('Double tap detected!');
-      //   if (isCapturing) {
-      //     console.log('Stopping photo capture...');
-      //     stopPhotoCapture();
-      //   } else {
-      //     console.log('Starting photo capture...');
-      //     startPhotoCapture();
-      //   }
-      // } else 
-      if (currentTapCount >= 3) {
-        console.log('Triple tap detected! Analyzing current view...');
-        analyzeCurrentFrame();
-      }
-      
-      // Reset tap count
-      tapCountRef.current = 0;
-    }, TAP_DELAY);
-  }, [isCapturing, startPhotoCapture, stopPhotoCapture, analyzeCurrentFrame]);
+    console.log('Single tap detected! Analyzing current view...');
+    analyzeCurrentFrame();
+  }, [analyzeCurrentFrame]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopAIAnalysis();
-      if (photoIntervalRef.current) {
-        clearInterval(photoIntervalRef.current);
-      }
       // Stop any ongoing speech
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
-  }, [stopAIAnalysis]);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black z-50" onClick={handleTap}>
@@ -362,31 +236,7 @@ export default function Camera({}: CameraProps) {
             ref={canvasRef}
             className="hidden"
           />
-          {isCapturing && (
-            <>
-              <div className="absolute top-4 left-4 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                📸 CAPTURING ({photoCount})
-              </div>
-              {aiDescription && (
-                <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium">AI Analysis</span>
-                  </div>
-                  <p className="text-sm">{aiDescription}</p>
-                </div>
-              )}
-              {isAnalyzing && !aiDescription && (
-                <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm">Analyzing...</span>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {!isCapturing && isAnalyzing && (
+          {isAnalyzing && (
             <div className={`absolute top-4 left-4 right-4 ${isDangerous ? 'bg-red-600' : 'bg-blue-600'} bg-opacity-90 text-white p-4 rounded-lg`}>
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 ${isDangerous ? 'bg-yellow-300' : 'bg-white'} rounded-full animate-pulse`}></div>
@@ -404,7 +254,7 @@ export default function Camera({}: CameraProps) {
               </div>
             </div>
           )}
-          {!isCapturing && aiDescription && (
+          {aiDescription && (
             <div className={`absolute bottom-4 left-4 right-4 ${isDangerous ? 'bg-red-900' : 'bg-black'} bg-opacity-90 text-white p-4 rounded-lg ${isDangerous ? 'border-2 border-red-400' : ''}`}>
               <div className="flex items-center gap-2 mb-2">
                 {isSpeaking ? (
