@@ -3,22 +3,27 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera as CameraIcon } from 'lucide-react';
 
+// Add type declaration for window.tapTimeout
+declare global {
+  interface Window {
+    tapTimeout?: NodeJS.Timeout;
+  }
+}
+
 interface CameraProps {
   onCapture?: (imageData: string) => void;
   onClose?: () => void;
 }
 
-export default function Camera({ onCapture, onClose }: CameraProps) {
+export default function Camera({}: CameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const aiAnalysisRef = useRef<NodeJS.Timeout | null>(null);
   const photoIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const tapCountRef = useRef<number>(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
-  const [lastTap, setLastTap] = useState<number>(0);
-  const [tapCount, setTapCount] = useState<number>(0);
+  const [facingMode] = useState<'user' | 'environment'>('environment');
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [photoCount, setPhotoCount] = useState<number>(0);
@@ -40,7 +45,6 @@ export default function Camera({ onCapture, onClose }: CameraProps) {
         videoRef.current.setAttribute('playsinline', 'true');
         videoRef.current.setAttribute('webkit-playsinline', 'true');
         await videoRef.current.play();
-        setIsStreaming(true);
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
@@ -52,15 +56,6 @@ export default function Camera({ onCapture, onClose }: CameraProps) {
   useEffect(() => {
     startCamera();
   }, [startCamera]);
-
-  const stopCamera = useCallback(() => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      setIsStreaming(false);
-    }
-  }, []);
 
   const capturePhoto = useCallback(() => {
     if (videoRef.current && canvasRef.current) {
@@ -195,27 +190,22 @@ export default function Camera({ onCapture, onClose }: CameraProps) {
   }, [capturePhoto]);
 
   const handleTap = useCallback(() => {
-  const now = Date.now();
-  const TAP_DELAY = 400;
+    const TAP_DELAY = 400;
 
-  setTapCount(prev => {
-    const newCount = prev + 1;
-    console.log('Tap detected, count:', newCount);
-    return newCount;
-  });
-  
-  setLastTap(now);
+    tapCountRef.current++;
+    console.log('Tap detected, count:', tapCountRef.current);
 
-  // Clear any existing timeout to prevent multiple timeouts
-  if (window.tapTimeout) {
-    clearTimeout(window.tapTimeout);
-  }
+    // Clear any existing timeout to prevent multiple timeouts
+    if (window.tapTimeout) {
+      clearTimeout(window.tapTimeout);
+    }
 
-  // Set new timeout
-  window.tapTimeout = setTimeout(() => {
-    setTapCount(currentCount => {
-      console.log('Processing tap count:', currentCount);
-      if (currentCount === 2) {
+    // Set new timeout
+    window.tapTimeout = setTimeout(() => {
+      const currentTapCount = tapCountRef.current;
+      console.log('Processing tap count:', currentTapCount);
+      
+      if (currentTapCount === 2) {
         console.log('Double tap detected!');
         if (isCapturing) {
           console.log('Stopping photo capture...');
@@ -224,14 +214,15 @@ export default function Camera({ onCapture, onClose }: CameraProps) {
           console.log('Starting photo capture...');
           startPhotoCapture();
         }
-      } else if (currentCount >= 3) {
+      } else if (currentTapCount >= 3) {
         console.log('Triple tap detected!');
         takeSinglePhoto();
       }
-      return 0; // Reset count
-    });
-  }, TAP_DELAY);
-}, [isCapturing, startPhotoCapture, stopPhotoCapture, takeSinglePhoto]);
+      
+      // Reset tap count
+      tapCountRef.current = 0;
+    }, TAP_DELAY);
+  }, [isCapturing, startPhotoCapture, stopPhotoCapture, takeSinglePhoto]);
 
   // Cleanup on unmount
   useEffect(() => {
