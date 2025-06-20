@@ -9,10 +9,11 @@
   "background_color": "#0a0a0a",
   "theme_color": "#171717",
   "orientation": "portrait-primary",
-  "categories": ["productivity", "utilities"],
+  "categories": ["productivity", "utilities", "photo"],
   "lang": "en",
   "dir": "ltr",
   "prefer_related_applications": false,
+  "permissions": ["camera"],
   "icons": [
     {
       "src": "/icon-192x192.png",

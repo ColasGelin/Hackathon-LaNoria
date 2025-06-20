@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Hackathon Lanoria",
-  description: "Hackathon Lanoria PWA App",
+  description: "Hackathon Lanoria PWA App with Camera",
   manifest: "/manifest.json",
   themeColor: "#171717",
   appleWebApp: {
@@ -32,12 +32,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Hackathon Lanoria",
     title: "Hackathon Lanoria",
-    description: "Hackathon Lanoria PWA App",
+    description: "Hackathon Lanoria PWA App with Camera",
   },
   twitter: {
     card: "summary",
     title: "Hackathon Lanoria",
-    description: "Hackathon Lanoria PWA App",
+    description: "Hackathon Lanoria PWA App with Camera",
   },
   viewport: {
     width: "device-width",
@@ -65,6 +65,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Lanoria" />
         <meta name="apple-touch-fullscreen" content="yes" />
+        
+        {/* Camera permissions */}
+        <meta name="permissions" content="camera" />
         
         {/* Disable various iOS Safari features */}
         <meta name="format-detection" content="telephone=no" />
