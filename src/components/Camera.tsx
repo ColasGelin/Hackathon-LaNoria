@@ -29,6 +29,29 @@ export default function Camera({}: CameraProps) {
   const [isDangerous, setIsDangerous] = useState(false);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  const touchStartY = useRef<number>(0);
+  const touchStartTime = useRef<number>(0);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    const touchEndTime = Date.now();
+    
+    const deltaY = touchStartY.current - touchEndY;
+    const deltaTime = touchEndTime - touchStartTime.current;
+    
+    // Swipe up detection: moved up at least 50px in less than 500ms
+    if (deltaY > 50 && deltaTime < 500) {
+      console.log("HEKJWQHEJKQWH");
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, []);
+
   const startCamera = useCallback(async () => {
     try {
       setError(null);
@@ -215,7 +238,7 @@ export default function Camera({}: CameraProps) {
     analyzeNow();
 
     // Then every 5 seconds
-    aiAnalysisRef.current = setInterval(analyzeNow, 3000);
+    aiAnalysisRef.current = setInterval(analyzeNow, 5000);
   }, [captureFrameForAI, analyzeFrame]);
 
   const stopAIAnalysis = useCallback(() => {
@@ -279,7 +302,11 @@ export default function Camera({}: CameraProps) {
   }, [stopAIAnalysis]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50">
+     <div 
+      className="fixed inset-0 bg-black z-50"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {error ? (
         <div className="h-full flex items-center justify-center p-4 bg-black">
           <div className="text-center text-white max-w-xs">
@@ -322,7 +349,12 @@ export default function Camera({}: CameraProps) {
           {isCapturing && (
             <>
               <div className="absolute top-20 left-4 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                🔍 AUTO ANALYZING ({analysisCount})
+                🔴 AUTO ANALYZING
+                <span className="ml-1">
+                  <span className="animate-pulse">.</span>
+                  <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
+                  <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
+                </span>
               </div>
               {aiDescription && (
                 <div className="absolute top-32 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
@@ -337,7 +369,14 @@ export default function Camera({}: CameraProps) {
                 <div className="absolute top-32 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm">Analyzing...</span>
+                    <span className="text-sm">
+                      Analyzing
+                      <span className="ml-1">
+                        <span className="animate-pulse">.</span>
+                        <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
+                        <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
+                      </span>
+                    </span>
                   </div>
                 </div>
               )}
