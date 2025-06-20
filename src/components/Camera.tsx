@@ -207,7 +207,7 @@ export default function Camera({}: CameraProps) {
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES'; // Spanish language
-      utterance.rate = 2.4; // Faster speech rate for quicker feedback
+      utterance.rate = 1.4; // Faster speech rate for quicker feedback
       utterance.volume = 1.0;
       utterance.pitch = 1.0; // Normal pitch for clarity
       
@@ -306,16 +306,17 @@ export default function Camera({}: CameraProps) {
       const currentTapCount = tapCountRef.current;
       console.log('Processing tap count:', currentTapCount);
       
-      if (currentTapCount === 2) {
-        console.log('Double tap detected!');
-        if (isCapturing) {
-          console.log('Stopping photo capture...');
-          stopPhotoCapture();
-        } else {
-          console.log('Starting photo capture...');
-          startPhotoCapture();
-        }
-      } else if (currentTapCount >= 3) {
+      // if (currentTapCount === 2) {
+      //   console.log('Double tap detected!');
+      //   if (isCapturing) {
+      //     console.log('Stopping photo capture...');
+      //     stopPhotoCapture();
+      //   } else {
+      //     console.log('Starting photo capture...');
+      //     startPhotoCapture();
+      //   }
+      // } else 
+      if (currentTapCount >= 3) {
         console.log('Triple tap detected! Analyzing current view...');
         analyzeCurrentFrame();
       }

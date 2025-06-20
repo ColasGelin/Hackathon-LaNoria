@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Lanoria",
     startupImage: [
-      "/icon-512x512.png",
+      "/logo.png",
     ],
   },
   formatDetection: {
@@ -78,15 +78,15 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#171717" />
         
         {/* Icons and manifest */}
-        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512x512.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/logo.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/logo.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/logo.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/logo.png" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="shortcut icon" href="/icon-192x192.png" />
+        <link rel="shortcut icon" href="/logo.png" />
         
         {/* Apple startup images */}
-        <link rel="apple-touch-startup-image" href="/icon-512x512.png" />
+        <link rel="apple-touch-startup-image" href="/logo.png" />
         
         {/* Prevent zoom and ensure proper viewport */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />

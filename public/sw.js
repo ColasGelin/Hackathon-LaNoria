@@ -2,8 +2,7 @@ const CACHE_NAME = 'lanoria-pwa-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/logo.png'
 ];
 
 self.addEventListener('install', (event) => {
