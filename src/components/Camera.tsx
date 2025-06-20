@@ -18,10 +18,13 @@ interface CameraProps {
 export default function Camera({}: CameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const aiAnalysisRef = useRef<NodeJS.Timeout | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode] = useState<'user' | 'environment'>('environment');
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisCount, setAnalysisCount] = useState<number>(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isDangerous, setIsDangerous] = useState(false);
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -173,7 +176,7 @@ export default function Camera({}: CameraProps) {
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES'; // Spanish language
-      utterance.rate = 1.4; // Faster speech rate for quicker feedback
+      utterance.rate = 1; // Faster speech rate for quicker feedback
       utterance.volume = 1.0;
       utterance.pitch = 1.0; // Normal pitch for clarity
       
@@ -192,6 +195,53 @@ export default function Camera({}: CameraProps) {
     }
   }, []);
 
+  const startAIAnalysis = useCallback(() => {
+    if (aiAnalysisRef.current) {
+      clearInterval(aiAnalysisRef.current);
+    }
+
+    setAnalysisCount(0);
+    
+    // Analyze frame immediately, then every 3 seconds
+    const analyzeNow = () => {
+      const frameData = captureFrameForAI();
+      if (frameData) {
+        analyzeFrame(frameData);
+        setAnalysisCount(prev => prev + 1);
+      }
+    };
+    
+    // First analysis immediately
+    analyzeNow();
+
+    // Then every 5 seconds
+    aiAnalysisRef.current = setInterval(analyzeNow, 3000);
+  }, [captureFrameForAI, analyzeFrame]);
+
+  const stopAIAnalysis = useCallback(() => {
+    if (aiAnalysisRef.current) {
+      clearInterval(aiAnalysisRef.current);
+      aiAnalysisRef.current = null;
+    }
+    setAiDescription('');
+    setIsAnalyzing(false);
+    setAnalysisCount(0);
+  }, []);
+
+  const startAutoAnalysis = useCallback(() => {
+    if (!isCapturing) {
+      setIsCapturing(true);
+      startAIAnalysis();
+    }
+  }, [isCapturing, startAIAnalysis]);
+
+  const stopAutoAnalysis = useCallback(() => {
+    if (isCapturing) {
+      setIsCapturing(false);
+      stopAIAnalysis();
+    }
+  }, [isCapturing, stopAIAnalysis]);
+
   const analyzeCurrentFrame = useCallback(() => {
     const frameData = captureFrameForAI();
     if (frameData) {
@@ -199,23 +249,37 @@ export default function Camera({}: CameraProps) {
     }
   }, [captureFrameForAI, analyzeFrame]);
 
-  const handleTap = useCallback(() => {
-    console.log('Single tap detected! Analyzing current view...');
+  // Handle top half tap (toggle auto analysis)
+  const handleTopTap = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('Top tap - toggling auto analysis');
+    if (isCapturing) {
+      stopAutoAnalysis();
+    } else {
+      startAutoAnalysis();
+    }
+  }, [isCapturing, startAutoAnalysis, stopAutoAnalysis]);
+
+  // Handle bottom half tap (single photo + AI analysis)
+  const handleBottomTap = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('Bottom tap - taking single photo and analyzing');
     analyzeCurrentFrame();
   }, [analyzeCurrentFrame]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      stopAIAnalysis();
       // Stop any ongoing speech
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [stopAIAnalysis]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50" onClick={handleTap}>
+    <div className="fixed inset-0 bg-black z-50">
       {error ? (
         <div className="h-full flex items-center justify-center p-4 bg-black">
           <div className="text-center text-white max-w-xs">
@@ -232,12 +296,56 @@ export default function Camera({}: CameraProps) {
             muted
             autoPlay
           />
+          
+          {/* Top half - Toggle auto analysis */}
+          <div 
+            className="absolute top-0 left-0 w-full h-1/2 z-10 cursor-pointer"
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', border : '2px solid rgba(255, 255, 255, 0.5)'
+            }}
+            onClick={handleTopTap}
+          >
+          </div>
+
+          {/* Bottom half - Single photo + AI analysis */}
+          <div 
+            className="absolute bottom-0 left-0 w-full h-1/2 z-10 cursor-pointer"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', border : '2px solid rgba(0, 0, 0, 0.5)' }}
+            onClick={handleBottomTap}
+          >
+          </div>
+
           <canvas
             ref={canvasRef}
             className="hidden"
           />
-          {isAnalyzing && (
-            <div className={`absolute top-4 left-4 right-4 ${isDangerous ? 'bg-red-600' : 'bg-blue-600'} bg-opacity-90 text-white p-4 rounded-lg`}>
+          
+          {isCapturing && (
+            <>
+              <div className="absolute top-20 left-4 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                🔍 AUTO ANALYZING ({analysisCount})
+              </div>
+              {aiDescription && (
+                <div className="absolute top-32 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">Continuous AI Analysis</span>
+                  </div>
+                  <p className="text-sm">{aiDescription}</p>
+                </div>
+              )}
+              {isAnalyzing && !aiDescription && (
+                <div className="absolute top-32 left-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm">Analyzing...</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          {!isCapturing && isAnalyzing && (
+            <div className={`absolute top-20 left-4 right-4 ${isDangerous ? 'bg-red-600' : 'bg-blue-600'} bg-opacity-90 text-white p-4 rounded-lg`}>
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 ${isDangerous ? 'bg-yellow-300' : 'bg-white'} rounded-full animate-pulse`}></div>
                 <span className="text-sm font-medium">
@@ -246,16 +354,18 @@ export default function Camera({}: CameraProps) {
               </div>
             </div>
           )}
+          
           {isDangerous && !isAnalyzing && (
-            <div className="absolute top-4 left-4 right-4 bg-red-600 bg-opacity-95 text-white p-4 rounded-lg border-2 border-yellow-400">
+            <div className="absolute top-20 left-4 right-4 bg-red-600 bg-opacity-95 text-white p-4 rounded-lg border-2 border-yellow-400">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-yellow-300 rounded-full animate-ping"></div>
                 <span className="text-lg font-bold">⚠️ ¡PELIGRO!</span>
               </div>
             </div>
           )}
-          {aiDescription && (
-            <div className={`absolute bottom-4 left-4 right-4 ${isDangerous ? 'bg-red-900' : 'bg-black'} bg-opacity-90 text-white p-4 rounded-lg ${isDangerous ? 'border-2 border-red-400' : ''}`}>
+          
+          {!isCapturing && aiDescription && (
+            <div className={`absolute top-32 left-4 right-4 ${isDangerous ? 'bg-red-900' : 'bg-black'} bg-opacity-90 text-white p-4 rounded-lg ${isDangerous ? 'border-2 border-red-400' : ''}`}>
               <div className="flex items-center gap-2 mb-2">
                 {isSpeaking ? (
                   <>
