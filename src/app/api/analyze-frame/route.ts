@@ -22,32 +22,48 @@ export async function POST(request: NextRequest) {
     
     const prompt = `Tu función es ser los ojos de una persona ciega. Esta persona ha tomado una foto con su cámara para entender lo que hay delante suya. 
 
-PRIORIDADES DE DETECCIÓN (detecta solo lo MÁS IMPORTANTE):
+ANÁLISIS DE PELIGROS: Primero evalúa si hay PELIGRO INMEDIATO que requiera alerta urgente.
 
-1. NAVEGACIÓN Y SEGURIDAD (MÁXIMA PRIORIDAD):
+SITUACIONES DE PELIGRO INMEDIATO (requieren alerta):
+- Escaleras descendentes a menos de 1 metro
+- Obstáculos grandes en el camino directo (postes, paredes, vehículos)
+- Bordillos o desniveles peligrosos muy cerca
+- Superficies resbaladizas o charcos grandes
+- Vehículos en movimiento cerca
+- Objetos colgantes a altura de cabeza
+
+FORMATO DE RESPUESTA OBLIGATORIO:
+
+Si hay PELIGRO, responde EXACTAMENTE así:
+{"danger": true, "description": "Cuidado! Estás a punto de chocarte con una pared"}
+
+Si NO hay peligro, responde EXACTAMENTE así:
+{"danger": false, "description": "Delante tuya hay una mesa y dos sillas"}
+
+PRIORIDADES NORMALES (sin peligro):
+1. NAVEGACIÓN Y SEGURIDAD:
 - Escaleras (subida/bajada), bordillos, desniveles
-- Obstáculos en el suelo (cables, objetos sueltos, charcos)
+- Obstáculos en el suelo (cables, objetos sueltos)
 - Puertas (abiertas/cerradas), pasillos libres
-- Superficies resbaladizas o peligrosas
 
 2. PERSONAS Y ANIMALES:
 - Personas cercanas y su posición relativa
+- Si ves a una persona y te parece amenazante/peligrosa, o que está haciendo algo raro, avisa al usuario
 - Animales domésticos
 
 3. OBJETOS DE USO COTIDIANO:
-- Solo si están muy cerca: teléfono, llaves, utensilios de cocina
+- Solo si están muy cerca: teléfono, llaves, utensilios
 
 4. MOBILIARIO RELEVANTE:
 - Sillas, mesas, sofás (solo si obstruyen el paso)
 
-INSTRUCCIONES:
-- Empezar con "Delante tuya..." 
-- Priorizar elementos de seguridad y navegación
-- Ignorar detalles decorativos, cielo, paredes vacías
-- Máximo 25 palabras
-- Ser específico sobre distancia y posición cuando sea relevante para la seguridad
-
-Describe SOLO lo esencial para la navegación y seguridad de esta persona ciega:`;
+REGLAS IMPORTANTES:
+- Máximo 20 palabras en la descripción
+- NO añadas texto extra fuera del JSON
+- NO expliques el análisis
+- SOLO el JSON como respuesta
+- Ser específico sobre distancia cuando sea relevante
+- Ignorar detalles decorativos`;
 
     const result = await model.generateContent([
       prompt,
@@ -60,9 +76,48 @@ Describe SOLO lo esencial para la navegación y seguridad de esta persona ciega:
     ]);
 
     const response = await result.response;
-    const description = response.text() || 'No se pudo analizar la imagen';
+    let responseText = response.text() || '{"danger": false, "description": "No se pudo analizar la imagen"}';
+    
+    // Clean the response - remove any markdown formatting or extra text
+    responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    
+    // Try to parse JSON response
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(responseText);
+      
+      // Validate the structure
+      if (!parsedResponse.hasOwnProperty('danger') || !parsedResponse.hasOwnProperty('description')) {
+        throw new Error('Invalid JSON structure');
+      }
+    } catch (error) {
+      console.error('JSON parsing error:', error, 'Raw response:', responseText);
+      
+      // Fallback parsing - try to extract meaningful information
+      const isDanger = responseText.toLowerCase().includes('cuidado') || 
+                      responseText.toLowerCase().includes('peligro') ||
+                      responseText.toLowerCase().includes('danger');
+      
+      let description = responseText;
+      // Try to extract description from malformed JSON
+      const descMatch = responseText.match(/"description":\s*"([^"]+)"/);
+      if (descMatch) {
+        description = descMatch[1];
+      } else {
+        // Clean up the text if it's not proper JSON
+        description = responseText.replace(/[{}":]/g, '').replace(/danger\s*(true|false)/gi, '').trim();
+        if (!description) {
+          description = 'No se pudo analizar la imagen';
+        }
+      }
+      
+      parsedResponse = {
+        danger: isDanger,
+        description: description
+      };
+    }
 
-    return NextResponse.json({ description });
+    return NextResponse.json(parsedResponse);
   } catch (error) {
     console.error('Error in analyze-frame API:', error);
     return NextResponse.json(

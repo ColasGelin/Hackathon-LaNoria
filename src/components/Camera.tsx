@@ -28,6 +28,8 @@ export default function Camera({}: CameraProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [photoCount, setPhotoCount] = useState<number>(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isDangerous, setIsDangerous] = useState(false);
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const startCamera = useCallback(async () => {
     try {
@@ -56,6 +58,9 @@ export default function Camera({}: CameraProps) {
   // Auto-start camera when component mounts
   useEffect(() => {
     startCamera();
+    // Initialize alert audio
+    alertAudioRef.current = new Audio('/alerta.mp3');
+    alertAudioRef.current.preload = 'auto';
   }, [startCamera]);
 
   const capturePhoto = useCallback(() => {
@@ -104,6 +109,15 @@ export default function Camera({}: CameraProps) {
     return null;
   }, []);
 
+  const playAlertSound = useCallback(() => {
+    if (alertAudioRef.current) {
+      alertAudioRef.current.currentTime = 0; // Reset to beginning
+      alertAudioRef.current.play().catch(error => {
+        console.error('Error playing alert sound:', error);
+      });
+    }
+  }, []);
+
   const analyzeFrame = useCallback(async (imageData: string) => {
     try {
       setIsAnalyzing(true);
@@ -118,9 +132,60 @@ export default function Camera({}: CameraProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setAiDescription(data.description);
-        // Read the description aloud in Spanish
-        speakText(data.description);
+        
+        // Ensure we have the proper structure, even if the API response is malformed
+        let isDangerous = false;
+        let description = '';
+        
+        if (data && typeof data === 'object') {
+          // If we got a proper JSON object from the API
+          isDangerous = Boolean(data.danger);
+          description = String(data.description || 'No se pudo analizar la imagen');
+        } else if (typeof data === 'string') {
+          // If we got a string, try to parse it or use it directly
+          try {
+            const parsed = JSON.parse(data);
+            isDangerous = Boolean(parsed.danger);
+            description = String(parsed.description || 'No se pudo analizar la imagen');
+          } catch {
+            // If parsing fails, treat as normal description
+            isDangerous = false;
+            description = data;
+          }
+        } else {
+          description = 'No se pudo analizar la imagen';
+        }
+        
+        // Clean up description - remove any JSON formatting if it leaked through
+        description = description.replace(/^.*?"description":\s*"?/, '').replace(/".*$/, '').trim();
+        if (description.includes('json') || description.includes('{') || description.includes('}')) {
+          // If there's still JSON formatting, extract just the meaningful part
+          const match = description.match(/(?:Delante tuya|Cuidado)[^{}]*?(?=\s*[{}]|$)/i);
+          if (match) {
+            description = match[0].trim();
+          }
+        }
+        
+        if (isDangerous) {
+          setIsDangerous(true);
+          // Play alert sound first
+          playAlertSound();
+          
+          // Wait a moment for the sound to play, then speak the warning
+          setTimeout(() => {
+            setAiDescription(description);
+            speakText(description);
+          }, 500);
+          
+          // Reset danger state after a few seconds
+          setTimeout(() => {
+            setIsDangerous(false);
+          }, 3000);
+        } else {
+          setIsDangerous(false);
+          setAiDescription(description);
+          speakText(description);
+        }
       } else {
         console.error('Failed to analyze frame:', response.statusText);
         speakText('Error al analizar la imagen');
@@ -131,7 +196,7 @@ export default function Camera({}: CameraProps) {
     } finally {
       setIsAnalyzing(false);
     }
-  }, []);
+  }, [playAlertSound]);
 
   const speakText = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
@@ -142,8 +207,9 @@ export default function Camera({}: CameraProps) {
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES'; // Spanish language
-      utterance.rate = 0.9; // Slightly slower for better comprehension
+      utterance.rate = 2.4; // Faster speech rate for quicker feedback
       utterance.volume = 1.0;
+      utterance.pitch = 1.0; // Normal pitch for clarity
       
       utterance.onend = () => {
         setIsSpeaking(false);
@@ -320,29 +386,43 @@ export default function Camera({}: CameraProps) {
             </>
           )}
           {!isCapturing && isAnalyzing && (
-            <div className="absolute top-4 left-4 right-4 bg-blue-600 bg-opacity-90 text-white p-4 rounded-lg">
+            <div className={`absolute top-4 left-4 right-4 ${isDangerous ? 'bg-red-600' : 'bg-blue-600'} bg-opacity-90 text-white p-4 rounded-lg`}>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium">Analizando imagen...</span>
+                <div className={`w-3 h-3 ${isDangerous ? 'bg-yellow-300' : 'bg-white'} rounded-full animate-pulse`}></div>
+                <span className="text-sm font-medium">
+                  {isDangerous ? '⚠️ Analizando peligros...' : 'Analizando imagen...'}
+                </span>
+              </div>
+            </div>
+          )}
+          {isDangerous && !isAnalyzing && (
+            <div className="absolute top-4 left-4 right-4 bg-red-600 bg-opacity-95 text-white p-4 rounded-lg border-2 border-yellow-400">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-yellow-300 rounded-full animate-ping"></div>
+                <span className="text-lg font-bold">⚠️ ¡PELIGRO!</span>
               </div>
             </div>
           )}
           {!isCapturing && aiDescription && (
-            <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-90 text-white p-4 rounded-lg">
+            <div className={`absolute bottom-4 left-4 right-4 ${isDangerous ? 'bg-red-900' : 'bg-black'} bg-opacity-90 text-white p-4 rounded-lg ${isDangerous ? 'border-2 border-red-400' : ''}`}>
               <div className="flex items-center gap-2 mb-2">
                 {isSpeaking ? (
                   <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium">🔊 Hablando...</span>
+                    <div className={`w-2 h-2 ${isDangerous ? 'bg-yellow-400' : 'bg-green-500'} rounded-full animate-pulse`}></div>
+                    <span className="text-sm font-medium">
+                      {isDangerous ? '⚠️ Alerta de seguridad...' : '🔊 Hablando...'}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-medium">Descripción</span>
+                    <div className={`w-2 h-2 ${isDangerous ? 'bg-red-500' : 'bg-blue-500'} rounded-full`}></div>
+                    <span className="text-sm font-medium">
+                      {isDangerous ? 'Alerta de peligro' : 'Descripción'}
+                    </span>
                   </>
                 )}
               </div>
-              <p className="text-sm">{aiDescription}</p>
+              <p className={`text-sm ${isDangerous ? 'font-semibold' : ''}`}>{aiDescription}</p>
             </div>
           )}
         </>
