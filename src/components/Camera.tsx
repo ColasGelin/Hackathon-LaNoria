@@ -24,7 +24,6 @@ export default function Camera({}: CameraProps) {
   const [facingMode] = useState<'user' | 'environment'>('environment');
   const [aiDescription, setAiDescription] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisCount, setAnalysisCount] = useState<number>(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isDangerous, setIsDangerous] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
@@ -149,6 +148,12 @@ export default function Camera({}: CameraProps) {
           setIsDangerous(true);
           // Play alert sound first
           playAlertSound();
+
+          if (navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          } else {
+            console.warn('Vibration API not supported.');
+          }
           
           // Wait a moment for the sound to play, then speak the warning
           setTimeout(() => {
@@ -283,14 +288,12 @@ export default function Camera({}: CameraProps) {
       clearInterval(aiAnalysisRef.current);
     }
 
-    setAnalysisCount(0);
     
     // Analyze frame immediately, then every 3 seconds
     const analyzeNow = () => {
       const frameData = captureFrameForAI();
       if (frameData) {
         analyzeFrame(frameData);
-        setAnalysisCount(prev => prev + 1);
       }
     };
     
@@ -308,7 +311,6 @@ export default function Camera({}: CameraProps) {
     }
     setAiDescription('');
     setIsAnalyzing(false);
-    setAnalysisCount(0);
   }, []);
 
   const startAutoAnalysis = useCallback(() => {
@@ -331,6 +333,8 @@ export default function Camera({}: CameraProps) {
       analyzeFrame(frameData);
     }
   }, [captureFrameForAI, analyzeFrame]);
+
+  
 
   // Handle top half tap (toggle auto analysis)
   const handleTopTap = useCallback((e: React.MouseEvent) => {

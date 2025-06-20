@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,7 +16,6 @@ export const metadata: Metadata = {
   title: "Hackathon Lanoria",
   description: "Hackathon Lanoria PWA App with Camera",
   manifest: "/manifest.json",
-  themeColor: "#171717",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -39,13 +38,15 @@ export const metadata: Metadata = {
     title: "Hackathon Lanoria",
     description: "Hackathon Lanoria PWA App with Camera",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#171717",
 };
 
 export default function RootLayout({
@@ -74,7 +75,6 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         
         {/* Theme and display */}
-        <meta name="theme-color" content="#171717" />
         <meta name="msapplication-TileColor" content="#171717" />
         
         {/* Icons and manifest */}
@@ -87,9 +87,6 @@ export default function RootLayout({
         
         {/* Apple startup images */}
         <link rel="apple-touch-startup-image" href="/logo.png" />
-        
-        {/* Prevent zoom and ensure proper viewport */}
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
