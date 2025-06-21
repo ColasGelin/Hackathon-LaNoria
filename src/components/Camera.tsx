@@ -29,6 +29,7 @@ export default function Camera({}: CameraProps) {
   const [isEmergency, setIsEmergency] = useState(false);
   const [emergencyMessage, setEmergencyMessage] = useState<string>('');
   const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isSpeakingRef = useRef<boolean>(false);
 
   const touchStartY = useRef<number>(0);
   const touchStartTime = useRef<number>(0);
@@ -184,23 +185,30 @@ export default function Camera({}: CameraProps) {
 
   const speakText = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
-      // Stop any ongoing speech
-      window.speechSynthesis.cancel();
+      // Don't cancel ongoing speech
+      if (isSpeakingRef.current) {
+        console.log('Already speaking, skipping new speech');
+        return;
+      }
       
       setIsSpeaking(true);
+      isSpeakingRef.current = true; // Set ref to true
       
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-ES'; // Spanish language
-      utterance.rate = 1; // Faster speech rate for quicker feedback
+      utterance.lang = 'es-ES';
+      utterance.rate = 1;
       utterance.volume = 1.0;
-      utterance.pitch = 1.0; // Normal pitch for clarity
+      utterance.pitch = 1.0;
       
       utterance.onend = () => {
         setIsSpeaking(false);
+        isSpeakingRef.current = false; // Set ref to false
+        console.log('Speech synthesis finished');
       };
       
       utterance.onerror = () => {
         setIsSpeaking(false);
+        isSpeakingRef.current = false; // Set ref to false
         console.error('Speech synthesis error');
       };
       
@@ -208,6 +216,7 @@ export default function Camera({}: CameraProps) {
     } else {
       console.warn('Speech synthesis not supported');
       setIsSpeaking(false);
+      isSpeakingRef.current = false; // Set ref to false
     }
   }, []);
 
@@ -288,9 +297,14 @@ export default function Camera({}: CameraProps) {
       clearInterval(aiAnalysisRef.current);
     }
 
-    
-    // Analyze frame immediately, then every 3 seconds
     const analyzeNow = () => {
+      // Check the ref instead of state
+      if (isSpeakingRef.current) {
+        console.log('Skipping analysis - speech in progress');
+        return;
+      }
+      
+      console.log('Executing analysis...'); // Add this for debugging
       const frameData = captureFrameForAI();
       if (frameData) {
         analyzeFrame(frameData);
@@ -300,8 +314,11 @@ export default function Camera({}: CameraProps) {
     // First analysis immediately
     analyzeNow();
 
-    // Then every 5 seconds
-    aiAnalysisRef.current = setInterval(analyzeNow, 5000);
+    // Then every 2 seconds - simplified condition
+    aiAnalysisRef.current = setInterval(() => {
+      console.log('Interval tick - isCapturing:', isCapturing, 'isSpeaking:', isSpeakingRef.current); // Debug log
+      analyzeNow(); // Remove the isCapturing check from here
+    }, 2000);
   }, [captureFrameForAI, analyzeFrame]);
 
   const stopAIAnalysis = useCallback(() => {
